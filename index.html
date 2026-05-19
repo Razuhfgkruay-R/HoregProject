@@ -38,7 +38,7 @@
             background: linear-gradient(180deg, #3a3a3a 0%, #222 100%);
             border: 1px solid #000;
             color: #aaa;
-            padding: 12px 24px;
+            padding: 12px 20px;
             border-radius: 6px;
             font-size: 16px;
             font-weight: bold;
@@ -46,12 +46,28 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
             transition: all 0.1s;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
         }
         .folder-btn.active {
             color: #fff;
             background: linear-gradient(180deg, #444 0%, #2a2a2a 100%);
             border-top: 2px solid #ff9800;
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .folder-delete-icon {
+            color: #777;
+            font-size: 14px;
+            font-weight: normal;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.1s;
+        }
+        .folder-delete-icon:hover {
+            background-color: #ff3333;
+            color: #fff;
         }
 
         .btn-action {
@@ -102,6 +118,30 @@
         .sound-pad:active {
             transform: translateY(4px);
             box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        .pad-delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid #444;
+            color: #888;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.1s;
+            z-index: 10;
+        }
+        .pad-delete-btn:hover {
+            background-color: #ff3333;
+            border-color: #ff3333;
+            color: #fff;
         }
 
         .pad-led {
@@ -214,13 +254,13 @@
             font-weight: bold;
             letter-spacing: 1px;
             z-index: 500;
-            pointer-events: none; /* Supaya tetap bisa di-klik menembus tulisan */
+            pointer-events: none;
             user-select: none;
             text-transform: uppercase;
         }
         
         .watermark span {
-            color: #ff9800; /* Aksen oranye untuk nama */
+            color: #ff9800;
             opacity: 0.8;
         }
     </style>
@@ -271,7 +311,7 @@
         };
 
         request.onerror = function(e) {
-            alert("Gagal mengaktifkan database lokal browser. Jika membuka file HTML langsung, beberapa browser membatasinya demi keamanan. Solusinya, coba langsung upload/deploy ke GitHub Pages.");
+            alert("Gagal mengaktifkan database lokal browser.");
         };
 
         // --- 2. STATE MANAGEMENT ---
@@ -279,20 +319,32 @@
         let currentFolderId = null;
         let activeAudioObjects = {};
 
-        // --- CUSTOM MODAL LOGIC (FIXED) ---
+        // --- CUSTOM MODAL LOGIC (DIPERLUAS UNTUK KONFIRMASI) ---
         let modalCallback = null;
 
-        function showModal(title, placeholder, defaultValue, callback) {
+        function showModal(title, placeholder, defaultValue, isConfirm, callback) {
             document.getElementById('modalTitle').innerText = title;
             const input = document.getElementById('modalInput');
-            input.placeholder = placeholder;
-            input.value = defaultValue || '';
+            const submitBtn = document.getElementById('modalSubmitBtn');
+            
+            if (isConfirm) {
+                input.classList.add('hidden');
+                submitBtn.innerText = "Hapus";
+                submitBtn.style.backgroundColor = "#ff3333";
+                submitBtn.style.color = "#fff";
+            } else {
+                input.classList.remove('hidden');
+                input.placeholder = placeholder;
+                input.value = defaultValue || '';
+                submitBtn.innerText = "Simpan";
+                submitBtn.style.backgroundColor = "#ff9800";
+                submitBtn.style.color = "#000";
+                input.focus();
+            }
             
             document.getElementById('customModal').classList.remove('hidden');
-            input.focus();
-            
             modalCallback = callback;
-            document.getElementById('modalSubmitBtn').onclick = submitModal;
+            submitBtn.onclick = submitModal;
         }
 
         function closeModal() {
@@ -301,7 +353,9 @@
         }
 
         function submitModal() {
-            const val = document.getElementById('modalInput').value.trim();
+            const input = document.getElementById('modalInput');
+            // Jika mode konfirmasi, langsung return true, jika input mode ambil teksnya
+            const val = input.classList.contains('hidden') ? true : input.value.trim();
             const callback = modalCallback;
             closeModal();
             if (callback) callback(val);
@@ -323,7 +377,9 @@
                 if (folders.length === 0) {
                     saveFolder({ id: Date.now().toString(), name: "Adegan 1", sounds: [] });
                 } else {
-                    if (!currentFolderId) currentFolderId = folders[0].id;
+                    if (!currentFolderId || !folders.find(f => f.id === currentFolderId)) {
+                        currentFolderId = folders[0].id;
+                    }
                     renderFolders();
                     renderPads();
                 }
@@ -339,11 +395,33 @@
         }
 
         function createFolder() {
-            showModal("Nama Folder / Adegan:", "Misal: Adegan 2", "", (name) => {
+            showModal("Nama Folder / Adegan:", "Misal: Adegan 2", "", false, (name) => {
                 if (name) {
                     const newFolder = { id: Date.now().toString(), name: name, sounds: [] };
                     currentFolderId = newFolder.id;
                     saveFolder(newFolder);
+                }
+            });
+        }
+
+        function deleteFolder(id, event) {
+            event.stopPropagation(); // Mencegah folder terpilih saat tombol hapus diklik
+            const folderToDelete = folders.find(f => f.id === id);
+            if (!folderToDelete) return;
+
+            showModal(`Hapus folder "${folderToDelete.name}" beserta seluruh isinya?`, "", "", true, (confirm) => {
+                if (confirm) {
+                    stopAllAudios();
+                    const tx = db.transaction("folders", "readwrite");
+                    const store = tx.objectStore("folders");
+                    store.delete(id);
+                    tx.oncomplete = () => {
+                        // Jika folder yang dihapus adalah folder aktif, pindah ke folder pertama yang tersedia
+                        if (currentFolderId === id) {
+                            currentFolderId = null;
+                        }
+                        loadFolders();
+                    };
                 }
             });
         }
@@ -361,8 +439,20 @@
             folders.forEach(folder => {
                 const btn = document.createElement('button');
                 btn.className = `folder-btn ${folder.id === currentFolderId ? 'active' : ''}`;
-                btn.innerText = folder.name;
                 btn.onclick = () => selectFolder(folder.id);
+                
+                // Tambahkan teks nama folder
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = folder.name;
+                btn.appendChild(nameSpan);
+
+                // Tambahkan tombol silang (✕) untuk hapus
+                const delIcon = document.createElement('span');
+                delIcon.className = 'folder-delete-icon';
+                delIcon.innerText = '✕';
+                delIcon.onclick = (e) => deleteFolder(folder.id, e);
+                btn.appendChild(delIcon);
+
                 folderList.appendChild(btn);
             });
         }
@@ -380,10 +470,23 @@
                 pad.id = `pad-${sound.id}`;
                 pad.onclick = () => toggleAudio(sound.id, sound.dataURL);
                 
-                pad.innerHTML = `
-                    <div class="pad-led"></div>
-                    <div class="pad-label">${sound.name}</div>
-                `;
+                // Tombol delete pad di pojok kanan atas
+                const delBtn = document.createElement('div');
+                delBtn.className = 'pad-delete-btn';
+                delBtn.innerText = '✕';
+                delBtn.onclick = (e) => deleteSound(sound.id, e);
+                pad.appendChild(delBtn);
+
+                // LED & Label teks
+                const led = document.createElement('div');
+                led.className = 'pad-led';
+                pad.appendChild(led);
+
+                const label = document.createElement('div');
+                label.className = 'pad-label';
+                label.innerText = sound.name;
+                pad.appendChild(label);
+
                 container.appendChild(pad);
             });
 
@@ -392,6 +495,30 @@
             addBtn.innerHTML = `<div class="pad-label">+ Upload Audio</div>`;
             addBtn.onclick = () => document.getElementById('audioUpload').click();
             container.appendChild(addBtn);
+        }
+
+        function deleteSound(soundId, event) {
+            event.stopPropagation(); // Mencegah lagu berputar saat menekan tombol hapus
+            
+            const currentFolder = folders.find(f => f.id === currentFolderId);
+            if (!currentFolder) return;
+            
+            const soundToDelete = currentFolder.sounds.find(s => s.id === soundId);
+            if (!soundToDelete) return;
+
+            showModal(`Hapus audio "${soundToDelete.name}"?`, "", "", true, (confirm) => {
+                if (confirm) {
+                    // Jika audio sedang berputar, matikan dulu
+                    if (activeAudioObjects[soundId]) {
+                        activeAudioObjects[soundId].pause();
+                        delete activeAudioObjects[soundId];
+                    }
+                    
+                    // Filter array untuk membuang lagu yang dipilih
+                    currentFolder.sounds = currentFolder.sounds.filter(s => s.id !== soundId);
+                    saveFolder(currentFolder);
+                }
+            });
         }
 
         // --- 4. LOGIKA PEMUTARAN AUDIO ---
@@ -436,7 +563,7 @@
 
             const defaultName = file.name.split('.')[0];
 
-            showModal("Nama tombol untuk audio ini:", "Nama Audio...", defaultName, (name) => {
+            showModal("Nama tombol untuk audio ini:", "Nama Audio...", defaultName, false, (name) => {
                 if (!name) {
                     event.target.value = "";
                     return;
