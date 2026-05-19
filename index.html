@@ -140,11 +140,11 @@
         .add-sound-pad:hover { border-color: #ff9800; color: #ff9800; }
         .hidden { display: none !important; }
 
-        /* --- CUSTOM MODAL STYLES --- */
+        /* CUSTOM MODAL STYLES */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.85); /* Latar belakang tembus pandang gelap */
+            background: rgba(0, 0, 0, 0.85);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -248,12 +248,16 @@
             loadFolders();
         };
 
+        request.onerror = function(e) {
+            alert("Gagal mengaktifkan database lokal browser. Jika membuka file HTML langsung, beberapa browser membatasinya demi keamanan. Solusinya, coba langsung upload/deploy ke GitHub Pages.");
+        };
+
         // --- 2. STATE MANAGEMENT ---
         let folders = [];
         let currentFolderId = null;
         let activeAudioObjects = {};
 
-        // --- CUSTOM MODAL LOGIC ---
+        // --- CUSTOM MODAL LOGIC (FIXED) ---
         let modalCallback = null;
 
         function showModal(title, placeholder, defaultValue, callback) {
@@ -266,8 +270,6 @@
             input.focus();
             
             modalCallback = callback;
-            
-            // Handle Submit
             document.getElementById('modalSubmitBtn').onclick = submitModal;
         }
 
@@ -278,17 +280,18 @@
 
         function submitModal() {
             const val = document.getElementById('modalInput').value.trim();
+            const callback = modalCallback; // Amankan fungsi callback sebelum modal direset
             closeModal();
-            if (modalCallback) modalCallback(val);
+            if (callback) callback(val); // Jalankan penyimpanan data setelah modal bersih
         }
 
-        // Tekan Enter untuk submit modal
         document.getElementById('modalInput').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') submitModal();
         });
 
         // --- 3. FUNGSI UI & LOGIKA ---
         function loadFolders() {
+            if (!db) return;
             const tx = db.transaction("folders", "readonly");
             const store = tx.objectStore("folders");
             const request = store.getAll();
@@ -306,6 +309,7 @@
         }
 
         function saveFolder(folderData) {
+            if (!db) return;
             const tx = db.transaction("folders", "readwrite");
             const store = tx.objectStore("folders");
             store.put(folderData);
@@ -313,7 +317,6 @@
         }
 
         function createFolder() {
-            // MENGGUNAKAN CUSTOM MODAL SEBAGAI PENGGANTI PROMPT
             showModal("Nama Folder / Adegan:", "Misal: Adegan 2", "", (name) => {
                 if (name) {
                     const newFolder = { id: Date.now().toString(), name: name, sounds: [] };
@@ -411,10 +414,9 @@
 
             const defaultName = file.name.split('.')[0];
 
-            // MENGGUNAKAN CUSTOM MODAL UNTUK NAMA TOMBOL AUDIO
             showModal("Nama tombol untuk audio ini:", "Nama Audio...", defaultName, (name) => {
                 if (!name) {
-                    event.target.value = ""; // Reset jika dibatalkan
+                    event.target.value = "";
                     return;
                 }
 
@@ -430,7 +432,7 @@
                     });
 
                     saveFolder(currentFolder);
-                    event.target.value = ""; // Reset input file
+                    event.target.value = "";
                 };
                 reader.readAsDataURL(file);
             });
