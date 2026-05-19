@@ -203,20 +203,40 @@
             cursor: pointer;
             font-size: 16px;
         }
+
+        /* WATERMARK STYLE */
+        .watermark {
+            position: fixed;
+            bottom: 15px;
+            right: 20px;
+            color: #555;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            z-index: 500;
+            pointer-events: none; /* Supaya tetap bisa di-klik menembus tulisan */
+            user-select: none;
+            text-transform: uppercase;
+        }
+        
+        .watermark span {
+            color: #ff9800; /* Aksen oranye untuk nama */
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div class="folders" id="folderList">
-            </div>
+        </div>
         <div>
             <button class="btn-action" onclick="createFolder()">+ Buat Folder (Adegan)</button>
         </div>
     </div>
 
     <div class="pad-container" id="padContainer">
-        </div>
+    </div>
 
     <input type="file" id="audioUpload" accept="audio/*" class="hidden" onchange="handleAudioUpload(event)">
 
@@ -230,6 +250,8 @@
             </div>
         </div>
     </div>
+
+    <div class="watermark">powered by <span>Razuhfgkruay</span></div>
 
     <script>
         // --- 1. SETUP DATABASE (IndexedDB) ---
@@ -280,9 +302,9 @@
 
         function submitModal() {
             const val = document.getElementById('modalInput').value.trim();
-            const callback = modalCallback; // Amankan fungsi callback sebelum modal direset
+            const callback = modalCallback;
             closeModal();
-            if (callback) callback(val); // Jalankan penyimpanan data setelah modal bersih
+            if (callback) callback(val);
         }
 
         document.getElementById('modalInput').addEventListener('keypress', function (e) {
