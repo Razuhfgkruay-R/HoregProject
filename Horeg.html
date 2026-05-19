@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mixer Sound Board</title>
+    <style>
+        /* Gaya UI Audio Mixer */
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body {
+            background-color: #111;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+        }
+
+        /* Folder / Banks (Adegan) */
+        .folders {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            flex-grow: 1;
+        }
+        
+        .folder-btn {
+            background: linear-gradient(180deg, #3a3a3a 0%, #222 100%);
+            border: 1px solid #000;
+            color: #aaa;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        .folder-btn.active {
+            color: #fff;
+            background: linear-gradient(180deg, #444 0%, #2a2a2a 100%);
+            border-top: 2px solid #ff9800;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .btn-action {
+            background-color: #ff9800;
+            color: #000;
+            border: none;
+            padding: 12px 20px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        .btn-action:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+        }
+
+        /* Area Tombol Suara (Pads) */
+        .pad-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 20px;
+            background-color: #1a1a1a;
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid #2a2a2a;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            min-height: 60vh;
+        }
+
+        .sound-pad {
+            background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%);
+            border: 2px solid #111;
+            border-radius: 10px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 8px 10px rgba(0,0,0,0.6), inset 0 2px 2px rgba(255,255,255,0.1);
+            transition: all 0.1s ease-out;
+            position: relative;
+        }
+
+        .sound-pad:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        .pad-led {
+            width: 15px;
+            height: 15px;
+            background-color: #333;
+            border-radius: 50%;
+            margin-bottom: 15px;
+            box-shadow: inset 0 2px 3px rgba(0,0,0,0.8);
+        }
+
+        .sound-pad.playing .pad-led {
+            background-color: #00ff00;
+            box-shadow: 0 0 15px #00ff00, inset 0 0 5px #fff;
+        }
+        
+        .sound-pad.playing {
+            border-color: #00ff00;
+        }
+
+        .pad-label {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ddd;
+            text-align: center;
+            padding: 0 10px;
+            word-wrap: break-word;
+        }
+
+        .add-sound-pad {
+            border: 2px dashed #444;
+            background: transparent;
+            box-shadow: none;
+            color: #666;
+        }
+        .add-sound-pad:hover { border-color: #ff9800; color: #ff9800; }
+        .hidden { display: none !important; }
+
+        /* --- CUSTOM MODAL STYLES --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); /* Latar belakang tembus pandang gelap */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            border: 2px solid #444;
+            border-top: 4px solid #ff9800;
+            border-radius: 10px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.9);
+        }
+
+        .modal-content h3 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 25px;
+            background: #111;
+            border: 1px solid #555;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 16px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .modal-content input:focus {
+            outline: none;
+            border-color: #ff9800;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+
+        .btn-cancel {
+            background: #444;
+            color: #ddd;
+            border: none;
+            padding: 12px 20px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="folders" id="folderList">
+            </div>
+        <div>
+            <button class="btn-action" onclick="createFolder()">+ Buat Folder (Adegan)</button>
+        </div>
+    </div>
+
+    <div class="pad-container" id="padContainer">
+        </div>
+
+    <input type="file" id="audioUpload" accept="audio/*" class="hidden" onchange="handleAudioUpload(event)">
+
+    <div id="customModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 id="modalTitle">Judul</h3>
+            <input type="text" id="modalInput" placeholder="..." autocomplete="off">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">Batal</button>
+                <button class="btn-action" id="modalSubmitBtn">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. SETUP DATABASE (IndexedDB) ---
+        let db;
+        const request = indexedDB.open("SoundBoardDB", 1);
+        
+        request.onupgradeneeded = function(e) {
+            db = e.target.result;
+            if (!db.objectStoreNames.contains("folders")) {
+                db.createObjectStore("folders", { keyPath: "id" });
+            }
+        };
+
+        request.onsuccess = function(e) {
+            db = e.target.result;
+            loadFolders();
+        };
+
+        // --- 2. STATE MANAGEMENT ---
+        let folders = [];
+        let currentFolderId = null;
+        let activeAudioObjects = {};
+
+        // --- CUSTOM MODAL LOGIC ---
+        let modalCallback = null;
+
+        function showModal(title, placeholder, defaultValue, callback) {
+            document.getElementById('modalTitle').innerText = title;
+            const input = document.getElementById('modalInput');
+            input.placeholder = placeholder;
+            input.value = defaultValue || '';
+            
+            document.getElementById('customModal').classList.remove('hidden');
+            input.focus();
+            
+            modalCallback = callback;
+            
+            // Handle Submit
+            document.getElementById('modalSubmitBtn').onclick = submitModal;
+        }
+
+        function closeModal() {
+            document.getElementById('customModal').classList.add('hidden');
+            modalCallback = null;
+        }
+
+        function submitModal() {
+            const val = document.getElementById('modalInput').value.trim();
+            closeModal();
+            if (modalCallback) modalCallback(val);
+        }
+
+        // Tekan Enter untuk submit modal
+        document.getElementById('modalInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') submitModal();
+        });
+
+        // --- 3. FUNGSI UI & LOGIKA ---
+        function loadFolders() {
+            const tx = db.transaction("folders", "readonly");
+            const store = tx.objectStore("folders");
+            const request = store.getAll();
+
+            request.onsuccess = function() {
+                folders = request.result;
+                if (folders.length === 0) {
+                    saveFolder({ id: Date.now().toString(), name: "Adegan 1", sounds: [] });
+                } else {
+                    if (!currentFolderId) currentFolderId = folders[0].id;
+                    renderFolders();
+                    renderPads();
+                }
+            };
+        }
+
+        function saveFolder(folderData) {
+            const tx = db.transaction("folders", "readwrite");
+            const store = tx.objectStore("folders");
+            store.put(folderData);
+            tx.oncomplete = () => loadFolders();
+        }
+
+        function createFolder() {
+            // MENGGUNAKAN CUSTOM MODAL SEBAGAI PENGGANTI PROMPT
+            showModal("Nama Folder / Adegan:", "Misal: Adegan 2", "", (name) => {
+                if (name) {
+                    const newFolder = { id: Date.now().toString(), name: name, sounds: [] };
+                    currentFolderId = newFolder.id;
+                    saveFolder(newFolder);
+                }
+            });
+        }
+
+        function selectFolder(id) {
+            stopAllAudios();
+            currentFolderId = id;
+            renderFolders();
+            renderPads();
+        }
+
+        function renderFolders() {
+            const folderList = document.getElementById('folderList');
+            folderList.innerHTML = '';
+            folders.forEach(folder => {
+                const btn = document.createElement('button');
+                btn.className = `folder-btn ${folder.id === currentFolderId ? 'active' : ''}`;
+                btn.innerText = folder.name;
+                btn.onclick = () => selectFolder(folder.id);
+                folderList.appendChild(btn);
+            });
+        }
+
+        function renderPads() {
+            const container = document.getElementById('padContainer');
+            container.innerHTML = '';
+            
+            const currentFolder = folders.find(f => f.id === currentFolderId);
+            if (!currentFolder) return;
+
+            currentFolder.sounds.forEach(sound => {
+                const pad = document.createElement('div');
+                pad.className = 'sound-pad';
+                pad.id = `pad-${sound.id}`;
+                pad.onclick = () => toggleAudio(sound.id, sound.dataURL);
+                
+                pad.innerHTML = `
+                    <div class="pad-led"></div>
+                    <div class="pad-label">${sound.name}</div>
+                `;
+                container.appendChild(pad);
+            });
+
+            const addBtn = document.createElement('div');
+            addBtn.className = 'sound-pad add-sound-pad';
+            addBtn.innerHTML = `<div class="pad-label">+ Upload Audio</div>`;
+            addBtn.onclick = () => document.getElementById('audioUpload').click();
+            container.appendChild(addBtn);
+        }
+
+        // --- 4. LOGIKA PEMUTARAN AUDIO ---
+        function toggleAudio(soundId, dataURL) {
+            const padElement = document.getElementById(`pad-${soundId}`);
+            
+            if (activeAudioObjects[soundId]) {
+                activeAudioObjects[soundId].pause();
+                activeAudioObjects[soundId].currentTime = 0;
+                delete activeAudioObjects[soundId];
+                padElement.classList.remove('playing');
+                return;
+            }
+
+            const audio = new Audio(dataURL);
+            audio.loop = false;
+            activeAudioObjects[soundId] = audio;
+            
+            padElement.classList.add('playing');
+            audio.play();
+
+            audio.onended = () => {
+                padElement.classList.remove('playing');
+                delete activeAudioObjects[soundId];
+            };
+        }
+
+        function stopAllAudios() {
+            for (let id in activeAudioObjects) {
+                activeAudioObjects[id].pause();
+                activeAudioObjects[id].currentTime = 0;
+                const pad = document.getElementById(`pad-${id}`);
+                if (pad) pad.classList.remove('playing');
+            }
+            activeAudioObjects = {};
+        }
+
+        // --- 5. UPLOAD & SIMPAN FILE AUDIO ---
+        function handleAudioUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const defaultName = file.name.split('.')[0];
+
+            // MENGGUNAKAN CUSTOM MODAL UNTUK NAMA TOMBOL AUDIO
+            showModal("Nama tombol untuk audio ini:", "Nama Audio...", defaultName, (name) => {
+                if (!name) {
+                    event.target.value = ""; // Reset jika dibatalkan
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const dataURL = e.target.result;
+                    
+                    const currentFolder = folders.find(f => f.id === currentFolderId);
+                    currentFolder.sounds.push({
+                        id: Date.now().toString(),
+                        name: name,
+                        dataURL: dataURL
+                    });
+
+                    saveFolder(currentFolder);
+                    event.target.value = ""; // Reset input file
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
